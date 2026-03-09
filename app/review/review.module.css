@@ -1,0 +1,129 @@
+.page {
+  margin: 0 auto;
+  max-width: 900px;
+  padding: 2rem 1rem 3rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #ffffff;
+}
+
+.title {
+  font-size: 1.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.meta {
+  color: #4b5563;
+  margin-bottom: 0.5rem;
+}
+
+.summary {
+  color: #111827;
+  line-height: 1.5;
+}
+
+.list {
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.itemTitle {
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.itemDetails {
+  color: #374151;
+  margin-bottom: 0.2rem;
+}
+
+.itemDue {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.button,
+.activeApprove,
+.activeDismiss,
+.submit {
+  border: 1px solid #9ca3af;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #111827;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+}
+
+.activeApprove {
+  border-color: #16a34a;
+  background: #ecfdf3;
+  color: #14532d;
+}
+
+.activeDismiss {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.submit {
+  margin-top: 0.75rem;
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pending {
+  margin-top: 0.5rem;
+  color: #4b5563;
+}
+
+.error {
+  color: #b91c1c;
+  margin-top: 0.75rem;
+}
+
+.result {
+  margin-top: 1rem;
+  border: 1px solid #d1fae5;
+  background: #ecfdf5;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.result a {
+  color: #065f46;
+  text-decoration: underline;
+}
