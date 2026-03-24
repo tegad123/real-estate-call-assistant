@@ -22,7 +22,7 @@ export type ParsedWebhookPayload = {
   transcript: string;
   contactName: string;
   contactPhone: string;
-  agentPhone: string;
+  agentEmail: string;
 };
 
 export type ExtractedActionItem = {

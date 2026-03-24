@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractActionItemsFromTranscript } from "@/lib/anthropic";
+import { notifyReviewLinkEmail } from "@/lib/notifications";
 import { createCallRecord } from "@/lib/store";
-import { sendSms } from "@/lib/twilio";
 import { buildReviewUrl, parseWebhookPayload } from "@/lib/webhook";
 
 export const runtime = "nodejs";
@@ -49,14 +49,23 @@ export async function POST(request: NextRequest) {
 
     const appBaseUrl = process.env.APP_BASE_URL || request.nextUrl.origin;
     const reviewUrl = buildReviewUrl(appBaseUrl, record.id);
-    const smsRecipient = payload.agentPhone || process.env.REVIEW_SMS_TO_PHONE;
-    if (!smsRecipient) {
-      throw new Error("Missing SMS recipient: provide agentPhone in webhook or REVIEW_SMS_TO_PHONE");
-    }
+    const emailRecipient = payload.agentEmail || process.env.REVIEW_EMAIL_TO;
+    const emailSubject = `Review call action items for ${record.contactName}`;
+    const emailBody = [
+      `You have new action items to review for ${record.contactName}.`,
+      "",
+      `Call summary: ${record.summary}`,
+      "",
+      `Review link: ${reviewUrl}`,
+    ].join("\n");
 
-    await sendSms({
-      to: smsRecipient,
-      body: `New call action items for ${record.contactName}. Review here: ${reviewUrl}`,
+    const notification = await notifyReviewLinkEmail({
+      to: emailRecipient,
+      subject: emailSubject,
+      body: emailBody,
+      reviewUrl,
+      contactName: record.contactName,
+      callId: record.id,
     });
 
     return NextResponse.json({
@@ -64,6 +73,12 @@ export async function POST(request: NextRequest) {
       callId: record.id,
       reviewUrl,
       actionItemCount: record.items.length,
+      notification,
+      email: {
+        to: emailRecipient || null,
+        subject: emailSubject,
+        body: emailBody,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown webhook error";

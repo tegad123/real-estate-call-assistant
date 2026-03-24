@@ -55,13 +55,14 @@ export function parseWebhookPayload(raw: unknown): ParsedWebhookPayload {
     pickFromCandidates(sources, ["contactName", "leadName", "name"]) || "Unknown Contact";
   const contactPhone =
     pickFromCandidates(sources, ["contactPhone", "leadPhone", "phone"]) || "Unknown";
-  const agentPhone = pickFromCandidates(sources, ["agentPhone", "smsTo", "reviewPhone"]) || "";
+  const agentEmail =
+    pickFromCandidates(sources, ["agentEmail", "reviewEmail", "email", "agent_email"]) || "";
 
   return {
     transcript,
     contactName,
     contactPhone,
-    agentPhone,
+    agentEmail,
   };
 }
 
