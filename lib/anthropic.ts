@@ -6,7 +6,7 @@ type AnthropicExtractResult = {
   action_items: ExtractedActionItem[];
 };
 
-const DEFAULT_MODEL = "claude-3-5-sonnet-latest";
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 function safeJsonParse<T>(value: string): T | null {
   try {
@@ -20,16 +20,42 @@ function stripCodeFence(text: string): string {
   return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
 }
 
-function extractJsonObject(text: string): string {
-  const stripped = stripCodeFence(text.trim());
-  const start = stripped.indexOf("{");
-  const end = stripped.lastIndexOf("}");
+function sanitizeJsonCandidate(text: string): string {
+  return text
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/,\s*([}\]])/g, "$1")
+    .trim();
+}
 
-  if (start === -1 || end === -1 || end <= start) {
-    return stripped;
+function extractJsonCandidates(text: string): string[] {
+  const stripped = stripCodeFence(text.trim());
+  const candidates = new Set<string>([stripped]);
+
+  let depth = 0;
+  let start = -1;
+
+  for (let i = 0; i < stripped.length; i += 1) {
+    const char = stripped[i];
+
+    if (char === "{") {
+      if (depth === 0) {
+        start = i;
+      }
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start !== -1) {
+        candidates.add(stripped.slice(start, i + 1));
+        start = -1;
+      }
+    }
   }
 
-  return stripped.slice(start, end + 1);
+  return [...candidates].map((value) => value.trim()).filter(Boolean);
 }
 
 function normalizeExtraction(result: AnthropicExtractResult): AnthropicExtractResult {
@@ -46,6 +72,55 @@ function normalizeExtraction(result: AnthropicExtractResult): AnthropicExtractRe
     : [];
 
   return { summary, action_items };
+}
+
+function parseExtractionFromUnknown(value: unknown): AnthropicExtractResult | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const maybe = value as {
+    summary?: unknown;
+    action_items?: unknown;
+  };
+
+  if (typeof maybe.summary !== "string") {
+    return null;
+  }
+
+  const action_items = Array.isArray(maybe.action_items)
+    ? (maybe.action_items as ExtractedActionItem[])
+    : [];
+
+  return normalizeExtraction({
+    summary: maybe.summary,
+    action_items,
+  });
+}
+
+function parseExtractionFromText(text: string): AnthropicExtractResult | null {
+  const candidates = extractJsonCandidates(text);
+
+  for (const candidate of candidates) {
+    const parsed =
+      safeJsonParse<AnthropicExtractResult>(candidate) ||
+      safeJsonParse<AnthropicExtractResult>(sanitizeJsonCandidate(candidate));
+
+    if (parsed) {
+      return normalizeExtraction(parsed);
+    }
+  }
+
+  return null;
+}
+
+function fallbackExtraction(text: string): AnthropicExtractResult {
+  const summary = text.replace(/\s+/g, " ").trim().slice(0, 600);
+
+  return normalizeExtraction({
+    summary: summary || "Summary unavailable from model output.",
+    action_items: [],
+  });
 }
 
 export async function extractActionItemsFromTranscript(
@@ -93,19 +168,29 @@ export async function extractActionItemsFromTranscript(
   }
 
   const body = (await response.json()) as {
-    content?: Array<{ type?: string; text?: string }>;
+    content?: Array<{ type?: string; text?: string; input?: unknown }>;
   };
 
-  const text = body.content?.find((part) => part.type === "text")?.text;
+  const toolInput = body.content?.find((part) => part.type === "tool_use")?.input;
+  const parsedFromTool = parseExtractionFromUnknown(toolInput);
+  if (parsedFromTool) {
+    return parsedFromTool;
+  }
+
+  const text = body.content
+    ?.filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text as string)
+    .join("\n")
+    .trim();
+
   if (!text) {
     throw new Error("Anthropic response did not include text content");
   }
 
-  const extractedJson = extractJsonObject(text);
-  const parsed = safeJsonParse<AnthropicExtractResult>(extractedJson);
-  if (!parsed) {
-    throw new Error("Anthropic output was not valid JSON");
+  const parsed = parseExtractionFromText(text);
+  if (parsed) {
+    return parsed;
   }
 
-  return normalizeExtraction(parsed);
+  return fallbackExtraction(text);
 }
